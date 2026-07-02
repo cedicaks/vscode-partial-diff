@@ -145,6 +145,11 @@
         "command": "extension.partialDiff.togglePreComparisonTextNormalizationRules",
         "title": "Toggle Pre-Comparison Text Normalization Rules",
         "category": "PartialDiff"
+      },
+      {
+        "command": "extension.partialDiff.saveComparisonResult",
+        "title": "Save Comparison Result to File",
+        "category": "PartialDiff"
       }
     ],
     "menus": {

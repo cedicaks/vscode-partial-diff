@@ -48,6 +48,7 @@ suite('ToggleNormalisationRulesCommand', () => {
             normalisationRuleStore,
             mock(CommandAdaptor),
             windowAdaptor,
+            mock(WorkspaceAdaptor),
             mockType<typeof vscode.env.clipboard>(),
             () => new Date('2016-06-15T11:43:00Z')
         );

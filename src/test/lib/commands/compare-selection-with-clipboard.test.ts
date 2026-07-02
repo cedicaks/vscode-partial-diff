@@ -5,6 +5,7 @@ import CommandFactory from '../../../lib/command-factory';
 import WindowAdaptor from '../../../lib/adaptors/window';
 import NormalisationRuleStore from '../../../lib/normalisation-rule-store';
 import CommandAdaptor from '../../../lib/adaptors/command';
+import WorkspaceAdaptor from '../../../lib/adaptors/workspace';
 import * as assert from 'assert';
 import * as vscode from 'vscode';
 
@@ -24,7 +25,7 @@ suite('CompareSelectionWithClipboardCommand', () => {
         const commandAdaptor = mock(CommandAdaptor);
         const windowAdaptor = mock(WindowAdaptor);
         const normalisationRuleStore = mock(NormalisationRuleStore);
-        const commandFactory = new CommandFactory(selectionInfoRegistry, normalisationRuleStore, commandAdaptor, windowAdaptor, clipboard, () => new Date('2016-06-15T11:43:00Z'));
+        const commandFactory = new CommandFactory(selectionInfoRegistry, normalisationRuleStore, commandAdaptor, windowAdaptor, mock(WorkspaceAdaptor), clipboard, () => new Date('2016-06-15T11:43:00Z'));
 
         const command = commandFactory.createCompareSelectionWithClipboardCommand();
 

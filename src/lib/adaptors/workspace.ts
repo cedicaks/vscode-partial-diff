@@ -13,4 +13,8 @@ export default class WorkspaceAdaptor {
     registerTextDocumentContentProvider(EXTENSION_SCHEME: string, contentProvider: ContentProvider): vscode.Disposable {
         return this.workspace.registerTextDocumentContentProvider(EXTENSION_SCHEME, contentProvider);
     }
+
+    async writeFile(uri: vscode.Uri, content: string): Promise<void> {
+        await this.workspace.fs.writeFile(uri, Buffer.from(content, 'utf8'));
+    }
 }

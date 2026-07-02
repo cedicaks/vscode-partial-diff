@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import TextEditor from './text-editor';
-import {QuickPickItem, TextEditor as VsTextEditor} from 'vscode';
+import {QuickPickItem, SaveDialogOptions, TextEditor as VsTextEditor, Uri} from 'vscode';
 
 export default class WindowAdaptor {
     constructor(private readonly window: typeof vscode.window) {}
@@ -12,6 +12,10 @@ export default class WindowAdaptor {
     async showQuickPick<T extends QuickPickItem>(items: T[]): Promise<T[] | undefined> {
         // @ts-ignore
         return this.window.showQuickPick(items, {canPickMany: true});
+    }
+
+    async showSaveDialog(options: SaveDialogOptions): Promise<Uri | undefined> {
+        return this.window.showSaveDialog(options);
     }
 
     async showInformationMessage(message: string): Promise<string | undefined> {

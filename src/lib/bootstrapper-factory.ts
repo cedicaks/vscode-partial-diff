@@ -24,6 +24,7 @@ export default class BootstrapperFactory {
             normalisationRuleStore,
             commandAdaptor,
             new WindowAdaptor(vscode.window),
+            workspaceAdaptor,
             vscode.env.clipboard,
             () => new Date()
         );

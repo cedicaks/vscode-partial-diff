@@ -57,6 +57,11 @@ export default class Bootstrapper {
                 name: `${EXTENSION_NAMESPACE}.togglePreComparisonTextNormalizationRules`,
                 type: 'GENERAL',
                 command: this.commandFactory.createToggleNormalisationRulesCommand()
+            },
+            {
+                name: `${EXTENSION_NAMESPACE}.saveComparisonResult`,
+                type: 'GENERAL',
+                command: this.commandFactory.createSaveComparisonResultCommand()
             }
         ];
     }
