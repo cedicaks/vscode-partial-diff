@@ -11,6 +11,19 @@ interface Hunk {
     end: number;
 }
 
+interface SideCell {
+    no: number;
+    text: string;
+}
+
+type RowKind = 'equal' | 'change' | 'delete' | 'insert';
+
+interface SideRow {
+    left: SideCell | null;
+    right: SideCell | null;
+    kind: RowKind;
+}
+
 const CONTEXT_LINES = 3;
 
 export default class DiffRenderer {
@@ -24,7 +37,9 @@ export default class DiffRenderer {
     }
 
     toHtml(title: string, fileName1: string, fileName2: string, ops: DiffOp[]): string {
-        const rows = this.numberLines(ops).map(line => this.renderHtmlRow(line)).join('\n');
+        const rows = this.buildSideRows(ops);
+        const leftRows = rows.map(row => this.renderPaneRow(row, 'left')).join('\n');
+        const rightRows = rows.map(row => this.renderPaneRow(row, 'right')).join('\n');
         return [
             '<!DOCTYPE html>',
             '<html lang="en">',
@@ -34,16 +49,16 @@ export default class DiffRenderer {
             `<style>${STYLE}</style>`,
             '</head>',
             '<body>',
-            `<h1>${this.escapeHtml(title)}</h1>`,
-            '<div class="legend">' +
-                `<span class="del">- ${this.escapeHtml(fileName1)}</span>` +
-                `<span class="ins">+ ${this.escapeHtml(fileName2)}</span>` +
+            `<header><h1>${this.escapeHtml(title)}</h1></header>`,
+            '<div class="pane-header">',
+            `<div class="pane-title del">- ${this.escapeHtml(fileName1)}</div>`,
+            `<div class="pane-title ins">+ ${this.escapeHtml(fileName2)}</div>`,
             '</div>',
-            '<table class="diff">',
-            '<tbody>',
-            rows,
-            '</tbody>',
-            '</table>',
+            '<div class="pane-wrap">',
+            `<div class="pane"><table>${leftRows}</table></div>`,
+            `<div class="pane"><table>${rightRows}</table></div>`,
+            '</div>',
+            `<script>${SCRIPT}</script>`,
             '</body>',
             '</html>',
             ''
@@ -108,16 +123,56 @@ export default class DiffRenderer {
         }
     }
 
-    private renderHtmlRow(line: NumberedLine): string {
-        const cssClass = line.op.type;
-        const oldNo = line.oldNo === -1 ? '' : String(line.oldNo);
-        const newNo = line.newNo === -1 ? '' : String(line.newNo);
+    private buildSideRows(ops: DiffOp[]): SideRow[] {
+        const rows: SideRow[] = [];
+        let oldNo = 1;
+        let newNo = 1;
+        let deletes: SideCell[] = [];
+        let inserts: SideCell[] = [];
+        const flush = () => {
+            const max = Math.max(deletes.length, inserts.length);
+            for (let i = 0; i < max; i++) {
+                const left = deletes[i] || null;
+                const right = inserts[i] || null;
+                const kind: RowKind = left && right ? 'change' : left ? 'delete' : 'insert';
+                rows.push({left, right, kind});
+            }
+            deletes = [];
+            inserts = [];
+        };
+        for (const op of ops) {
+            if (op.type === 'equal') {
+                flush();
+                rows.push({left: {no: oldNo, text: op.text}, right: {no: newNo, text: op.text}, kind: 'equal'});
+                oldNo++;
+                newNo++;
+            } else if (op.type === 'delete') {
+                deletes.push({no: oldNo, text: op.text});
+                oldNo++;
+            } else {
+                inserts.push({no: newNo, text: op.text});
+                newNo++;
+            }
+        }
+        flush();
+        return rows;
+    }
+
+    private renderPaneRow(row: SideRow, side: 'left' | 'right'): string {
+        const cell = side === 'left' ? row.left : row.right;
+        const cssClass = this.cellClass(row, cell, side);
+        const lineNo = cell ? String(cell.no) : '';
+        const content = cell && cell.text.length ? this.escapeHtml(cell.text) : '&#8203;';
         return `<tr class="${cssClass}">` +
-            `<td class="lineno">${oldNo}</td>` +
-            `<td class="lineno">${newNo}</td>` +
-            `<td class="marker">${this.prefix(line.op.type)}</td>` +
-            `<td class="content">${this.escapeHtml(line.op.text)}</td>` +
+            `<td class="lineno">${lineNo}</td>` +
+            `<td class="content">${content}</td>` +
             '</tr>';
+    }
+
+    private cellClass(row: SideRow, cell: SideCell | null, side: 'left' | 'right'): string {
+        if (!cell) return 'empty';
+        if (row.kind === 'equal') return 'equal';
+        return side === 'left' ? 'del' : 'ins';
     }
 
     private escapeHtml(text: string): string {
@@ -130,18 +185,38 @@ export default class DiffRenderer {
 }
 
 const STYLE = [
-    'body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;margin:1rem;color:#24292e;background:#fff;}',
-    'h1{font-size:1.1rem;font-weight:600;}',
-    '.legend{margin-bottom:0.75rem;font-size:0.85rem;}',
-    '.legend span{margin-right:1rem;padding:0.1rem 0.4rem;border-radius:3px;}',
-    '.legend .del{background:#ffeef0;color:#b31d28;}',
-    '.legend .ins{background:#e6ffed;color:#22863a;}',
-    'table.diff{border-collapse:collapse;width:100%;font-family:"SFMono-Regular",Consolas,monospace;font-size:0.85rem;}',
-    'table.diff td{padding:0 0.5rem;vertical-align:top;white-space:pre-wrap;}',
-    'td.lineno{text-align:right;color:#959da5;user-select:none;width:1%;white-space:nowrap;}',
-    'td.marker{text-align:center;user-select:none;width:1%;}',
-    'tr.delete{background:#ffeef0;}',
-    'tr.delete .marker,tr.delete .content{color:#b31d28;}',
-    'tr.insert{background:#e6ffed;}',
-    'tr.insert .marker,tr.insert .content{color:#22863a;}'
+    'html,body{height:100%;}',
+    'body{margin:0;display:flex;flex-direction:column;',
+    'font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;',
+    'background:#0d1117;color:#c9d1d9;}',
+    'header{flex:0 0 auto;padding:0.5rem 1rem;border-bottom:1px solid #21262d;}',
+    'h1{font-size:1rem;font-weight:600;margin:0;}',
+    '.pane-header{flex:0 0 auto;display:flex;}',
+    '.pane-title{flex:1 1 0;min-width:0;padding:0.35rem 0.75rem;',
+    'font-family:"SFMono-Regular",Consolas,monospace;font-size:0.8rem;',
+    'border-bottom:1px solid #21262d;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}',
+    '.pane-title.del{color:#ff7b72;}',
+    '.pane-title.ins{color:#3fb950;}',
+    '.pane-title+.pane-title{border-left:1px solid #21262d;}',
+    '.pane-wrap{flex:1 1 auto;display:flex;min-height:0;}',
+    '.pane{flex:1 1 0;min-width:0;overflow:auto;}',
+    '.pane+.pane{border-left:1px solid #21262d;}',
+    'table{border-collapse:collapse;width:100%;',
+    'font-family:"SFMono-Regular",Consolas,monospace;font-size:0.85rem;}',
+    'td{padding:0 0.5rem;white-space:pre;vertical-align:top;line-height:1.4;}',
+    'td.lineno{text-align:right;color:#6e7681;user-select:none;width:1%;white-space:nowrap;}',
+    'tr.del td.content{background:rgba(248,81,73,0.15);color:#ffdcd7;}',
+    'tr.ins td.content{background:rgba(63,185,80,0.15);color:#aff5b4;}',
+    'tr.empty td{background:rgba(110,118,129,0.08);}'
+].join('');
+
+const SCRIPT = [
+    '(function(){',
+    'var panes=document.querySelectorAll(".pane");var active=null;',
+    'panes.forEach(function(p){p.addEventListener("scroll",function(){',
+    'if(active&&active!==p)return;active=p;',
+    'panes.forEach(function(o){if(o!==p)o.scrollTop=p.scrollTop;});',
+    'requestAnimationFrame(function(){active=null;});',
+    '});});',
+    '})();'
 ].join('');

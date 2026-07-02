@@ -25,6 +25,7 @@ module.exports = {
     filename: 'extension.js',
     library: {type: 'commonjs2'},
     devtoolModuleFilenameTemplate: '../[resource-path]',
+    clean: true,
   },
   devtool: 'source-map',
   externals: {

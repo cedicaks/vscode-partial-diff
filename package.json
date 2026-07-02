@@ -185,7 +185,7 @@
   "scripts": {
     "coverage": "nyc mocha",
     "compile:dev": "webpack --mode development",
-    "compile:prod": "rm -rf dist && webpack --mode production",
+    "compile:prod": "webpack --mode production",
     "compile:test:it": "tsc -p ./",
     "lint": "tslint -p .",
     "watch": "npm run compile:dev -- --watch",

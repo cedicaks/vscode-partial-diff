@@ -36,13 +36,15 @@ suite('DiffRenderer', () => {
     });
 
     suite('#toHtml', () => {
-        test('it renders an HTML document with colour-coded rows', () => {
+        test('it renders a side-by-side HTML document with colour-coded rows', () => {
             const result = renderer.toHtml('TITLE', 'FILE1', 'FILE2', ops);
 
             assert.ok(result.startsWith('<!DOCTYPE html>'));
             assert.ok(result.includes('<title>TITLE</title>'));
-            assert.ok(result.includes('<tr class="delete">'));
-            assert.ok(result.includes('<tr class="insert">'));
+            assert.ok(result.includes('<div class="pane-title del">- FILE1</div>'));
+            assert.ok(result.includes('<div class="pane-title ins">+ FILE2</div>'));
+            assert.ok(result.includes('<tr class="del">'));
+            assert.ok(result.includes('<tr class="ins">'));
             assert.ok(result.includes('<td class="content">b</td>'));
         });
 
@@ -50,6 +52,17 @@ suite('DiffRenderer', () => {
             const result = renderer.toHtml('TITLE', 'F1', 'F2', [{type: 'equal', text: '<a> & "b"'}]);
 
             assert.ok(result.includes('&lt;a&gt; &amp; &quot;b&quot;'));
+        });
+
+        test('it pads the opposite pane with an empty filler row for unmatched lines', () => {
+            const result = renderer.toHtml('TITLE', 'F1', 'F2', [
+                {type: 'equal', text: 'a'},
+                {type: 'insert', text: 'b'},
+                {type: 'equal', text: 'c'}
+            ]);
+
+            assert.ok(result.includes('<tr class="empty">'));
+            assert.ok(result.includes('<td class="content">b</td>'));
         });
     });
 });
