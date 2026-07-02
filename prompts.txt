@@ -12,3 +12,14 @@ PROMPT2:
         - How many lines are modified
 3. Make the scroll bar on the right just like what the comparison tabs like it seen in the vscode, which contain a green / red / .. mark to see where is the differences (replace the standard scrollbar). So viewer can quickly tell where are the differences
 
+PROMPT3:
+
+1. Make the bottom (horizontal) scrollbars always shown (not only when the page is scrolled to the bottom)
+2. Make the bottom scrollbar has color theme like the vertical scrollbar. (dark)
+3. Make the vertical scrollbar wider (3x current width)
+
+
+PROMPT4:
+
+1. Make the html output left & right file name display easy to be renamed in the html file. The renaming will be done using a text editor.
+

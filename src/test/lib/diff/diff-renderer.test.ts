@@ -80,7 +80,7 @@ suite('DiffRenderer', () => {
         test('it renders a single scroll area with a custom overview ruler', () => {
             const result = renderer.toHtml('TITLE', 'F1', 'F2', ops);
 
-            assert.ok(result.includes('<div class="scroller">'));
+            assert.ok(result.includes('<div class="panes">'));
             assert.ok(result.includes('<div class="ruler">'));
             assert.ok(result.includes('<div class="thumb"></div>'));
             assert.ok(/<div class="marker mod" style="top:[\d.]+%"><\/div>/.test(result));
