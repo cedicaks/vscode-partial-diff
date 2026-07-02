@@ -1,3 +1,14 @@
 PROMPT1:
 
 1. Add a feature to save a comparison result tab to file: .html and .diff
+
+PROMPT2:
+
+1. In the html file only show 1 vertical scroll bar. The left part doesn't need scroll bar, because one scroll bar on the right is enough.
+2. At the bottom of the html page show a information section that (which look nice):
+    a. Show resume of the differences:
+        - How many lines are added
+        - How many lines are removed
+        - How many lines are modified
+3. Make the scroll bar on the right just like what the comparison tabs like it seen in the vscode, which contain a green / red / .. mark to see where is the differences (replace the standard scrollbar). So viewer can quickly tell where are the differences
+

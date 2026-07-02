@@ -24,6 +24,12 @@ interface SideRow {
     kind: RowKind;
 }
 
+export interface DiffSummary {
+    added: number;
+    removed: number;
+    modified: number;
+}
+
 const CONTEXT_LINES = 3;
 
 export default class DiffRenderer {
@@ -36,10 +42,21 @@ export default class DiffRenderer {
         return header + body;
     }
 
+    summarize(ops: DiffOp[]): DiffSummary {
+        const rows = this.buildSideRows(ops);
+        return {
+            added: rows.filter(row => row.kind === 'insert').length,
+            removed: rows.filter(row => row.kind === 'delete').length,
+            modified: rows.filter(row => row.kind === 'change').length
+        };
+    }
+
     toHtml(title: string, fileName1: string, fileName2: string, ops: DiffOp[]): string {
         const rows = this.buildSideRows(ops);
         const leftRows = rows.map(row => this.renderPaneRow(row, 'left')).join('\n');
         const rightRows = rows.map(row => this.renderPaneRow(row, 'right')).join('\n');
+        const markers = this.renderRulerMarkers(rows);
+        const summary = this.summarize(ops);
         return [
             '<!DOCTYPE html>',
             '<html lang="en">',
@@ -53,11 +70,16 @@ export default class DiffRenderer {
             '<div class="pane-header">',
             `<div class="pane-title del">- ${this.escapeHtml(fileName1)}</div>`,
             `<div class="pane-title ins">+ ${this.escapeHtml(fileName2)}</div>`,
+            '<div class="ruler-spacer"></div>',
             '</div>',
-            '<div class="pane-wrap">',
+            '<div class="diff-body">',
+            '<div class="scroller">',
             `<div class="pane"><table>${leftRows}</table></div>`,
             `<div class="pane"><table>${rightRows}</table></div>`,
             '</div>',
+            `<div class="ruler">${markers}<div class="thumb"></div></div>`,
+            '</div>',
+            this.renderSummary(summary),
             `<script>${SCRIPT}</script>`,
             '</body>',
             '</html>',
@@ -175,6 +197,37 @@ export default class DiffRenderer {
         return side === 'left' ? 'del' : 'ins';
     }
 
+    private renderRulerMarkers(rows: SideRow[]): string {
+        const total = rows.length || 1;
+        return rows
+            .map((row, index) => {
+                if (row.kind === 'equal') return '';
+                const top = (index / total * 100).toFixed(3);
+                return `<div class="marker ${this.markerClass(row.kind)}" style="top:${top}%"></div>`;
+            })
+            .join('');
+    }
+
+    private markerClass(kind: RowKind): string {
+        switch (kind) {
+            case 'insert':
+                return 'add';
+            case 'delete':
+                return 'del';
+            default:
+                return 'mod';
+        }
+    }
+
+    private renderSummary(summary: DiffSummary): string {
+        return '<footer class="summary">' +
+            '<span class="summary-title">Summary of differences</span>' +
+            `<span class="stat added"><b>${summary.added}</b> added</span>` +
+            `<span class="stat removed"><b>${summary.removed}</b> removed</span>` +
+            `<span class="stat modified"><b>${summary.modified}</b> modified</span>` +
+            '</footer>';
+    }
+
     private escapeHtml(text: string): string {
         return text
             .replace(/&/g, '&amp;')
@@ -183,6 +236,8 @@ export default class DiffRenderer {
             .replace(/"/g, '&quot;');
     }
 }
+
+const RULER_WIDTH = 14;
 
 const STYLE = [
     'html,body{height:100%;}',
@@ -198,8 +253,12 @@ const STYLE = [
     '.pane-title.del{color:#ff7b72;}',
     '.pane-title.ins{color:#3fb950;}',
     '.pane-title+.pane-title{border-left:1px solid #21262d;}',
-    '.pane-wrap{flex:1 1 auto;display:flex;min-height:0;}',
-    '.pane{flex:1 1 0;min-width:0;overflow:auto;}',
+    `.ruler-spacer{flex:0 0 ${RULER_WIDTH}px;border-bottom:1px solid #21262d;}`,
+    '.diff-body{flex:1 1 auto;display:flex;min-height:0;}',
+    '.scroller{flex:1 1 auto;display:flex;align-items:flex-start;min-width:0;',
+    'overflow-y:auto;overflow-x:hidden;scrollbar-width:none;-ms-overflow-style:none;}',
+    '.scroller::-webkit-scrollbar{width:0;height:0;}',
+    '.pane{flex:1 1 0;min-width:0;overflow-x:auto;overflow-y:hidden;}',
     '.pane+.pane{border-left:1px solid #21262d;}',
     'table{border-collapse:collapse;width:100%;',
     'font-family:"SFMono-Regular",Consolas,monospace;font-size:0.85rem;}',
@@ -207,16 +266,50 @@ const STYLE = [
     'td.lineno{text-align:right;color:#6e7681;user-select:none;width:1%;white-space:nowrap;}',
     'tr.del td.content{background:rgba(248,81,73,0.15);color:#ffdcd7;}',
     'tr.ins td.content{background:rgba(63,185,80,0.15);color:#aff5b4;}',
-    'tr.empty td{background:rgba(110,118,129,0.08);}'
+    'tr.empty td{background:rgba(110,118,129,0.08);}',
+    `.ruler{flex:0 0 ${RULER_WIDTH}px;position:relative;background:#161b22;`,
+    'border-left:1px solid #21262d;cursor:pointer;}',
+    '.ruler .marker{position:absolute;left:2px;right:2px;height:2px;border-radius:1px;}',
+    '.ruler .marker.add{background:#3fb950;}',
+    '.ruler .marker.del{background:#f85149;}',
+    '.ruler .marker.mod{background:#d29922;}',
+    '.ruler .thumb{position:absolute;left:2px;right:2px;top:0;height:0;',
+    'background:rgba(110,118,129,0.5);border-radius:3px;}',
+    '.ruler:hover .thumb{background:rgba(110,118,129,0.7);}',
+    '.summary{flex:0 0 auto;display:flex;align-items:center;gap:1.25rem;',
+    'padding:0.6rem 1rem;border-top:1px solid #21262d;background:#161b22;font-size:0.85rem;}',
+    '.summary-title{font-weight:600;margin-right:0.5rem;}',
+    '.stat{display:inline-flex;align-items:center;gap:0.35rem;}',
+    '.stat::before{content:"";width:0.7rem;height:0.7rem;border-radius:50%;display:inline-block;}',
+    '.stat b{font-variant-numeric:tabular-nums;}',
+    '.stat.added::before{background:#3fb950;}',
+    '.stat.removed::before{background:#f85149;}',
+    '.stat.modified::before{background:#d29922;}'
 ].join('');
 
 const SCRIPT = [
     '(function(){',
-    'var panes=document.querySelectorAll(".pane");var active=null;',
-    'panes.forEach(function(p){p.addEventListener("scroll",function(){',
-    'if(active&&active!==p)return;active=p;',
-    'panes.forEach(function(o){if(o!==p)o.scrollTop=p.scrollTop;});',
-    'requestAnimationFrame(function(){active=null;});',
-    '});});',
+    'var scroller=document.querySelector(".scroller");',
+    'var ruler=document.querySelector(".ruler");',
+    'var thumb=ruler&&ruler.querySelector(".thumb");',
+    'if(!scroller||!ruler||!thumb)return;',
+    'function update(){',
+    'var sh=scroller.scrollHeight,ch=scroller.clientHeight,rh=ruler.clientHeight;',
+    'var th=ch>=sh?rh:Math.max(20,ch/sh*rh);',
+    'thumb.style.height=th+"px";',
+    'thumb.style.top=(sh>ch?scroller.scrollTop/(sh-ch)*(rh-th):0)+"px";',
+    '}',
+    'function scrollToY(y){',
+    'var rect=ruler.getBoundingClientRect();',
+    'var ratio=Math.max(0,Math.min(1,(y-rect.top)/rect.height));',
+    'scroller.scrollTop=ratio*(scroller.scrollHeight-scroller.clientHeight);',
+    '}',
+    'var dragging=false;',
+    'ruler.addEventListener("mousedown",function(e){dragging=true;scrollToY(e.clientY);e.preventDefault();});',
+    'window.addEventListener("mousemove",function(e){if(dragging)scrollToY(e.clientY);});',
+    'window.addEventListener("mouseup",function(){dragging=false;});',
+    'scroller.addEventListener("scroll",update);',
+    'window.addEventListener("resize",update);',
+    'update();',
     '})();'
 ].join('');
