@@ -66,10 +66,19 @@ export default class DiffRenderer {
             `<style>${STYLE}</style>`,
             '</head>',
             '<body>',
-            `<header><h1>${this.escapeHtml(title)}</h1></header>`,
+            '<!-- =====================================================================',
+            '     RENAME THE COMPARED FILES',
+            '     Edit the "left" and "right" values in the <script> block below,',
+            '     then save this file and reopen it. That is the only place the two',
+            '     names need to be changed - the title and column headers update from it.',
+            '     ===================================================================== -->',
+            '<script>',
+            `window.partialDiffFiles = {left: ${this.jsString(fileName1)}, right: ${this.jsString(fileName2)}};`,
+            '</script>',
+            '<header><h1 class="diff-title"></h1></header>',
             '<div class="pane-header">',
-            `<div class="pane-title del">- ${this.escapeHtml(fileName1)}</div>`,
-            `<div class="pane-title ins">+ ${this.escapeHtml(fileName2)}</div>`,
+            '<div class="pane-title del" data-side="left"></div>',
+            '<div class="pane-title ins" data-side="right"></div>',
             '<div class="ruler-spacer"></div>',
             '</div>',
             '<div class="diff-body">',
@@ -80,7 +89,7 @@ export default class DiffRenderer {
             `<div class="ruler">${markers}<div class="thumb"></div></div>`,
             '</div>',
             this.renderSummary(summary),
-            `<script>${SCRIPT}</script>`,
+            `<script>${NAMES_SCRIPT}${SCRIPT}</script>`,
             '</body>',
             '</html>',
             ''
@@ -235,6 +244,11 @@ export default class DiffRenderer {
             .replace(/>/g, '&gt;')
             .replace(/"/g, '&quot;');
     }
+
+    // Produce a safe JavaScript string literal (also neutralises `</script>`).
+    private jsString(value: string): string {
+        return JSON.stringify(value).replace(/</g, '\\u003c');
+    }
 }
 
 const RULER_WIDTH = 42;
@@ -293,6 +307,17 @@ const STYLE = [
     '.stat.added::before{background:#3fb950;}',
     '.stat.removed::before{background:#f85149;}',
     '.stat.modified::before{background:#d29922;}'
+].join('');
+
+const NAMES_SCRIPT = [
+    '(function(){',
+    'var f=window.partialDiffFiles||{left:"",right:""};',
+    'var title=f.left+" \\u2194 "+f.right;',
+    'document.title=title;',
+    'var h=document.querySelector(".diff-title");if(h)h.textContent=title;',
+    'var l=document.querySelector(".pane-title[data-side=left]");if(l)l.textContent="- "+f.left;',
+    'var r=document.querySelector(".pane-title[data-side=right]");if(r)r.textContent="+ "+f.right;',
+    '})();'
 ].join('');
 
 const SCRIPT = [

@@ -53,11 +53,24 @@ suite('DiffRenderer', () => {
 
             assert.ok(result.startsWith('<!DOCTYPE html>'));
             assert.ok(result.includes('<title>TITLE</title>'));
-            assert.ok(result.includes('<div class="pane-title del">- FILE1</div>'));
-            assert.ok(result.includes('<div class="pane-title ins">+ FILE2</div>'));
+            assert.ok(result.includes('<div class="pane-title del" data-side="left"></div>'));
+            assert.ok(result.includes('<div class="pane-title ins" data-side="right"></div>'));
             assert.ok(result.includes('<tr class="del">'));
             assert.ok(result.includes('<tr class="ins">'));
             assert.ok(result.includes('<td class="content">b</td>'));
+        });
+
+        test('it exposes the file names as a single editable config block', () => {
+            const result = renderer.toHtml('TITLE', 'FILE1', 'FILE2', ops);
+
+            assert.ok(result.includes('RENAME THE COMPARED FILES'));
+            assert.ok(result.includes('window.partialDiffFiles = {left: "FILE1", right: "FILE2"};'));
+        });
+
+        test('it safely encodes file names that contain quotes or markup', () => {
+            const result = renderer.toHtml('TITLE', 'a"b', 'c</script>d', ops);
+
+            assert.ok(result.includes('window.partialDiffFiles = {left: "a\\"b", right: "c\\u003c/script>d"};'));
         });
 
         test('it escapes HTML special characters in the content', () => {
