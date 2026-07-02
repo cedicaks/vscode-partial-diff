@@ -90,6 +90,14 @@ suite('DiffRenderer', () => {
             assert.ok(result.includes('<td class="content">b</td>'));
         });
 
+        test('it gives the tables a fixed, content-derived width to keep reflow cheap', () => {
+            const result = renderer.toHtml('TITLE', 'F1', 'F2', ops);
+
+            assert.ok(result.includes('table-layout:fixed'));
+            assert.ok(result.includes('min-width:100%'));
+            assert.ok(/--lineno:\d+ch;--content:\d+ch/.test(result));
+        });
+
         test('it renders the "show only differences" checkbox and "Swap" button', () => {
             const result = renderer.toHtml('TITLE', 'F1', 'F2', mixedOps);
 

@@ -57,6 +57,7 @@ export default class DiffRenderer {
         const rightRows = rows.map(row => this.renderPaneRow(row, 'right')).join('\n');
         const markers = this.renderRulerMarkers(rows);
         const summary = this.summarize(ops);
+        const tableAttr = this.tableStyle(rows);
         return [
             '<!DOCTYPE html>',
             '<html lang="en">',
@@ -83,8 +84,8 @@ export default class DiffRenderer {
             '</div>',
             '<div class="diff-body">',
             '<div class="panes">',
-            `<div class="pane" data-side="left"><table>${leftRows}</table></div>`,
-            `<div class="pane" data-side="right"><table>${rightRows}</table></div>`,
+            `<div class="pane" data-side="left"><table ${tableAttr}>${leftRows}</table></div>`,
+            `<div class="pane" data-side="right"><table ${tableAttr}>${rightRows}</table></div>`,
             '</div>',
             `<div class="ruler">${markers}<div class="thumb"></div></div>`,
             '</div>',
@@ -206,6 +207,23 @@ export default class DiffRenderer {
         return side === 'left' ? 'del' : 'ins';
     }
 
+    // Build a fixed table width from the longest line so the browser never has
+    // to measure every line to size columns (which makes reflow O(all chars) and
+    // freezes the page on swap / window changes). `ch` is exact in a monospace
+    // font; `min-width:100%` keeps short diffs filling the pane.
+    private tableStyle(rows: SideRow[]): string {
+        const maxLineLength = rows.reduce((max, row) => {
+            const leftLen = row.left ? row.left.text.length : 0;
+            const rightLen = row.right ? row.right.text.length : 0;
+            return Math.max(max, leftLen, rightLen);
+        }, 0);
+        const lineNoCh = String(Math.max(rows.length, 1)).length + 3;
+        const contentCh = maxLineLength + 4;
+        return 'style="table-layout:fixed;' +
+            'width:calc(var(--lineno) + var(--content));min-width:100%;' +
+            `--lineno:${lineNoCh}ch;--content:${contentCh}ch"`;
+    }
+
     private renderRulerMarkers(rows: SideRow[]): string {
         const total = rows.length || 1;
         return rows
@@ -297,10 +315,11 @@ const STYLE = [
     'border-radius:7px;border:3px solid #161b22;}',
     '.pane::-webkit-scrollbar-thumb:hover{background:rgba(110,118,129,0.7);}',
     '.pane{scrollbar-color:rgba(110,118,129,0.5) #161b22;}',
-    'table{border-collapse:collapse;width:100%;',
+    'table{border-collapse:collapse;',
     'font-family:"SFMono-Regular",Consolas,monospace;font-size:0.85rem;}',
     'td{padding:0 0.5rem;white-space:pre;vertical-align:top;line-height:1.4;}',
-    'td.lineno{text-align:right;color:#6e7681;user-select:none;width:1%;white-space:nowrap;}',
+    'td.lineno{text-align:right;color:#6e7681;user-select:none;',
+    'width:var(--lineno);white-space:nowrap;}',
     'tr.del td.content{background:rgba(248,81,73,0.15);color:#ffdcd7;}',
     'tr.ins td.content{background:rgba(63,185,80,0.15);color:#aff5b4;}',
     'tr.empty td{background:rgba(110,118,129,0.08);}',

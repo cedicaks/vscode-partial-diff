@@ -31,3 +31,9 @@ PROMPT5:
 PROMPT6:
 
 1. Make the separation of differences (in show only differences mode) clearer, increase the thickness of the line and add a bit space above and below the separator line 
+
+PROMPT7:
+
+1. Why after clicking the Swap button the page is not responding for several seconds?
+2. The same thing also happen if the browser tab containing the page (brave) to become a new window
+
