@@ -27,3 +27,7 @@ PROMPT5:
 
 1. Add checkbox at the bottom section "Show only differences" to show only differences with some lines before and after. Show the differences separated by thin line in this mode.
 2. Add a button "Swap" to swap left section and the right section. This also modify the diff "Add" and "Remove" result (also switched).
+
+PROMPT6:
+
+1. Make the separation of differences (in show only differences mode) clearer, increase the thickness of the line and add a bit space above and below the separator line 
