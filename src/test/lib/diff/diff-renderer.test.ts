@@ -55,8 +55,8 @@ suite('DiffRenderer', () => {
             assert.ok(result.includes('<title>TITLE</title>'));
             assert.ok(result.includes('<div class="pane-title del" data-side="left"></div>'));
             assert.ok(result.includes('<div class="pane-title ins" data-side="right"></div>'));
-            assert.ok(result.includes('<tr class="del">'));
-            assert.ok(result.includes('<tr class="ins">'));
+            assert.ok(result.includes('<tr class="del" data-kind="change">'));
+            assert.ok(result.includes('<tr class="ins" data-kind="change">'));
             assert.ok(result.includes('<td class="content">b</td>'));
         });
 
@@ -86,8 +86,27 @@ suite('DiffRenderer', () => {
                 {type: 'equal', text: 'c'}
             ]);
 
-            assert.ok(result.includes('<tr class="empty">'));
+            assert.ok(result.includes('<tr class="empty" data-kind="insert">'));
             assert.ok(result.includes('<td class="content">b</td>'));
+        });
+
+        test('it renders the "show only differences" checkbox and "Swap" button', () => {
+            const result = renderer.toHtml('TITLE', 'F1', 'F2', mixedOps);
+
+            assert.ok(result.includes('id="pd-only-diffs"'));
+            assert.ok(result.includes('Show only differences'));
+            assert.ok(result.includes('id="pd-swap"'));
+            assert.ok(result.includes('>Swap</button>'));
+        });
+
+        test('it tags panes and rows so swap and collapse can operate client-side', () => {
+            const result = renderer.toHtml('TITLE', 'F1', 'F2', mixedOps);
+
+            assert.ok(result.includes('<div class="pane" data-side="left">'));
+            assert.ok(result.includes('<div class="pane" data-side="right">'));
+            assert.ok(result.includes('data-kind="equal"'));
+            assert.ok(result.includes('data-kind="delete"'));
+            assert.ok(result.includes('data-kind="insert"'));
         });
 
         test('it renders a single scroll area with a custom overview ruler', () => {

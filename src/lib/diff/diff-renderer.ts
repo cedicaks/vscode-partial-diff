@@ -68,7 +68,7 @@ export default class DiffRenderer {
             '<body>',
             '<!-- =====================================================================',
             '     RENAME THE COMPARED FILES',
-            '     Edit the "left" and "right" values in the <script> block below,',
+            '     Edit the "left" and "right" values in the script block below,',
             '     then save this file and reopen it. That is the only place the two',
             '     names need to be changed - the title and column headers update from it.',
             '     ===================================================================== -->',
@@ -83,8 +83,8 @@ export default class DiffRenderer {
             '</div>',
             '<div class="diff-body">',
             '<div class="panes">',
-            `<div class="pane"><table>${leftRows}</table></div>`,
-            `<div class="pane"><table>${rightRows}</table></div>`,
+            `<div class="pane" data-side="left"><table>${leftRows}</table></div>`,
+            `<div class="pane" data-side="right"><table>${rightRows}</table></div>`,
             '</div>',
             `<div class="ruler">${markers}<div class="thumb"></div></div>`,
             '</div>',
@@ -194,7 +194,7 @@ export default class DiffRenderer {
         const cssClass = this.cellClass(row, cell, side);
         const lineNo = cell ? String(cell.no) : '';
         const content = cell && cell.text.length ? this.escapeHtml(cell.text) : '&#8203;';
-        return `<tr class="${cssClass}">` +
+        return `<tr class="${cssClass}" data-kind="${row.kind}">` +
             `<td class="lineno">${lineNo}</td>` +
             `<td class="content">${content}</td>` +
             '</tr>';
@@ -234,6 +234,10 @@ export default class DiffRenderer {
             `<span class="stat added"><b>${summary.added}</b> added</span>` +
             `<span class="stat removed"><b>${summary.removed}</b> removed</span>` +
             `<span class="stat modified"><b>${summary.modified}</b> modified</span>` +
+            '<span class="controls">' +
+            '<label class="control"><input type="checkbox" id="pd-only-diffs"> Show only differences</label>' +
+            '<button type="button" id="pd-swap" class="control-btn">Swap</button>' +
+            '</span>' +
             '</footer>';
     }
 
@@ -265,14 +269,25 @@ const STYLE = [
     '.pane-title{flex:1 1 0;min-width:0;padding:0.35rem 0.75rem;',
     'font-family:"SFMono-Regular",Consolas,monospace;font-size:0.8rem;',
     'border-bottom:1px solid #21262d;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}',
-    '.pane-title.del{color:#ff7b72;}',
-    '.pane-title.ins{color:#3fb950;}',
-    '.pane-title+.pane-title{border-left:1px solid #21262d;}',
+    '.pane-title[data-side=left]{color:#ff7b72;}',
+    '.pane-title[data-side=left]::before{content:"- ";}',
+    '.pane-title[data-side=right]{color:#3fb950;}',
+    '.pane-title[data-side=right]::before{content:"+ ";}',
+    '.pane-title[data-side=right]{border-left:1px solid #21262d;}',
     `.ruler-spacer{flex:0 0 ${RULER_WIDTH}px;border-bottom:1px solid #21262d;}`,
     '.diff-body{flex:1 1 auto;display:flex;min-height:0;}',
     '.panes{flex:1 1 auto;display:flex;min-width:0;overflow:hidden;}',
     '.pane{flex:1 1 0;min-width:0;height:100%;overflow-x:scroll;overflow-y:auto;}',
-    '.pane+.pane{border-left:1px solid #21262d;}',
+    '.pane[data-side=right]{border-left:1px solid #21262d;}',
+    // Swap: reorder the two sides and flip their colours / signs / dividers.
+    '.swapped .pane[data-side=left],.swapped .pane-title[data-side=left]{order:2;}',
+    '.swapped .pane[data-side=right],.swapped .pane-title[data-side=right]{order:1;}',
+    '.swapped .pane[data-side=right],.swapped .pane-title[data-side=right]{border-left:none;}',
+    '.swapped .pane[data-side=left],.swapped .pane-title[data-side=left]{border-left:1px solid #21262d;}',
+    '.swapped .pane-title[data-side=left]{color:#3fb950;}',
+    '.swapped .pane-title[data-side=left]::before{content:"+ ";}',
+    '.swapped .pane-title[data-side=right]{color:#ff7b72;}',
+    '.swapped .pane-title[data-side=right]::before{content:"- ";}',
     // Hide each pane\'s vertical scrollbar (the ruler replaces it) but always
     // show a dark-themed horizontal scrollbar pinned at the bottom of the pane.
     `.pane::-webkit-scrollbar{width:0;height:${HSCROLL_HEIGHT}px;}`,
@@ -289,12 +304,19 @@ const STYLE = [
     'tr.del td.content{background:rgba(248,81,73,0.15);color:#ffdcd7;}',
     'tr.ins td.content{background:rgba(63,185,80,0.15);color:#aff5b4;}',
     'tr.empty td{background:rgba(110,118,129,0.08);}',
+    // Swap: removals become additions and vice versa.
+    '.swapped tr.del td.content{background:rgba(63,185,80,0.15);color:#aff5b4;}',
+    '.swapped tr.ins td.content{background:rgba(248,81,73,0.15);color:#ffdcd7;}',
+    // Thin separator between blocks in "show only differences" mode.
+    'tr.block-start td{border-top:1px solid #30363d;}',
     `.ruler{flex:0 0 ${RULER_WIDTH}px;position:relative;background:#161b22;`,
     'border-left:1px solid #21262d;cursor:pointer;}',
     '.ruler .marker{position:absolute;left:4px;right:4px;height:3px;border-radius:1px;}',
     '.ruler .marker.add{background:#3fb950;}',
     '.ruler .marker.del{background:#f85149;}',
     '.ruler .marker.mod{background:#d29922;}',
+    '.swapped .ruler .marker.add{background:#f85149;}',
+    '.swapped .ruler .marker.del{background:#3fb950;}',
     '.ruler .thumb{position:absolute;left:3px;right:3px;top:0;height:0;',
     'background:rgba(110,118,129,0.5);border-radius:4px;}',
     '.ruler:hover .thumb{background:rgba(110,118,129,0.7);}',
@@ -306,7 +328,14 @@ const STYLE = [
     '.stat b{font-variant-numeric:tabular-nums;}',
     '.stat.added::before{background:#3fb950;}',
     '.stat.removed::before{background:#f85149;}',
-    '.stat.modified::before{background:#d29922;}'
+    '.stat.modified::before{background:#d29922;}',
+    '.controls{margin-left:auto;display:flex;align-items:center;gap:1rem;}',
+    '.control{display:inline-flex;align-items:center;gap:0.4rem;cursor:pointer;user-select:none;}',
+    '.control input{cursor:pointer;margin:0;}',
+    '.control-btn{background:#21262d;color:#c9d1d9;border:1px solid #30363d;',
+    'border-radius:5px;padding:0.25rem 0.75rem;cursor:pointer;font:inherit;}',
+    '.control-btn:hover{background:#30363d;}',
+    '.control-btn:active{background:#3c444d;}'
 ].join('');
 
 const NAMES_SCRIPT = [
@@ -315,19 +344,22 @@ const NAMES_SCRIPT = [
     'var title=f.left+" \\u2194 "+f.right;',
     'document.title=title;',
     'var h=document.querySelector(".diff-title");if(h)h.textContent=title;',
-    'var l=document.querySelector(".pane-title[data-side=left]");if(l)l.textContent="- "+f.left;',
-    'var r=document.querySelector(".pane-title[data-side=right]");if(r)r.textContent="+ "+f.right;',
+    'var l=document.querySelector(".pane-title[data-side=left]");if(l)l.textContent=f.left;',
+    'var r=document.querySelector(".pane-title[data-side=right]");if(r)r.textContent=f.right;',
     '})();'
 ].join('');
 
 const SCRIPT = [
     '(function(){',
+    'var CTX=3;',
     'var panes=[].slice.call(document.querySelectorAll(".pane"));',
+    'if(!panes.length)return;',
     'var ruler=document.querySelector(".ruler");',
     'var thumb=ruler&&ruler.querySelector(".thumb");',
-    'if(!panes.length||!ruler||!thumb)return;',
     'var ref=panes[0];var active=null;',
+    'var rows=panes.map(function(p){return [].slice.call(p.querySelectorAll("tr"));});',
     'function update(){',
+    'if(!ruler||!thumb)return;',
     'var sh=ref.scrollHeight,ch=ref.clientHeight,rh=ruler.clientHeight;',
     'var th=ch>=sh?rh:Math.max(20,ch/sh*rh);',
     'thumb.style.height=th+"px";',
@@ -338,18 +370,44 @@ const SCRIPT = [
     'panes.forEach(function(o){if(o!==p)o.scrollTop=p.scrollTop;});',
     'update();requestAnimationFrame(function(){active=null;});',
     '}',
-    'function scrollToY(y){',
+    'panes.forEach(function(p){p.addEventListener("scroll",function(){onScroll(p);});});',
+    'if(ruler){',
+    'var scrollToY=function(y){',
     'var rect=ruler.getBoundingClientRect();',
     'var ratio=Math.max(0,Math.min(1,(y-rect.top)/rect.height));',
     'var top=ratio*(ref.scrollHeight-ref.clientHeight);',
     'panes.forEach(function(p){p.scrollTop=top;});update();',
-    '}',
-    'panes.forEach(function(p){p.addEventListener("scroll",function(){onScroll(p);});});',
+    '};',
     'var dragging=false;',
     'ruler.addEventListener("mousedown",function(e){dragging=true;scrollToY(e.clientY);e.preventDefault();});',
     'window.addEventListener("mousemove",function(e){if(dragging)scrollToY(e.clientY);});',
     'window.addEventListener("mouseup",function(){dragging=false;});',
+    '}',
     'window.addEventListener("resize",update);',
+    // "Show only differences": keep changed rows plus CTX context lines, hide
+    // the rest, and mark the first row of each surviving block for a separator.
+    'var only=document.getElementById("pd-only-diffs");',
+    'function applyCollapse(){',
+    'var show=only&&only.checked;var n=rows[0].length;var vis=new Array(n);var i,j;',
+    'for(i=0;i<n;i++)vis[i]=!show;',
+    'if(show){for(i=0;i<n;i++){if(rows[0][i].getAttribute("data-kind")!=="equal"){',
+    'var s=Math.max(0,i-CTX),e=Math.min(n-1,i+CTX);for(j=s;j<=e;j++)vis[j]=true;}}}',
+    'var seen=false,prev=false;',
+    'for(i=0;i<n;i++){var v=vis[i];var start=show&&v&&!prev&&seen;',
+    '(function(idx,visible,isStart){rows.forEach(function(list){var tr=list[idx];',
+    'tr.style.display=visible?"":"none";',
+    'if(isStart)tr.classList.add("block-start");else tr.classList.remove("block-start");});})(i,v,start);',
+    'if(v)seen=true;prev=v;}',
+    'update();',
+    '}',
+    'if(only)only.addEventListener("change",applyCollapse);',
+    // "Swap": flip sides (CSS) and swap the added/removed counts.
+    'var swapBtn=document.getElementById("pd-swap");',
+    'function swapCounts(){var a=document.querySelector(".stat.added b");',
+    'var r=document.querySelector(".stat.removed b");',
+    'if(a&&r){var t=a.textContent;a.textContent=r.textContent;r.textContent=t;}}',
+    'if(swapBtn)swapBtn.addEventListener("click",function(){',
+    'document.body.classList.toggle("swapped");swapCounts();update();});',
     'update();',
     '})();'
 ].join('');
