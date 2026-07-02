@@ -27,6 +27,23 @@ suite('LineDiffer', () => {
         ]);
     });
 
+    test('it treats lines differing only by line ending (CRLF vs LF) as equal', () => {
+        assert.deepEqual(differ.diff('a\r\nb\r\nc', 'a\nb\nc'), [
+            {type: 'equal', text: 'a'},
+            {type: 'equal', text: 'b'},
+            {type: 'equal', text: 'c'}
+        ]);
+    });
+
+    test('it still detects a real change amongst mixed line endings', () => {
+        assert.deepEqual(differ.diff('a\r\nb\r\nc', 'a\nB\nc'), [
+            {type: 'equal', text: 'a'},
+            {type: 'delete', text: 'b'},
+            {type: 'insert', text: 'B'},
+            {type: 'equal', text: 'c'}
+        ]);
+    });
+
     test('it represents a changed line as a delete followed by an insert', () => {
         assert.deepEqual(differ.diff('a\nb\nc', 'a\nB\nc'), [
             {type: 'equal', text: 'a'},

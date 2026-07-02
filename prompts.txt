@@ -40,3 +40,7 @@ PROMPT7:
 PROMPT8:
 
 11. Just like the PROMPT4. Add an 'initial-position' setting (initially swapped or not) as a boolean setting. if this value is true then the diff will initially show swapped state.
+
+PROMPT9:
+
+1. In the "safe to file" feature. It looks like the comparison think the line ended with \r and \r\n is different although the line content is the same. Because when I use the PartialDiff: Compare Text With Clipboard the comparison is good (only different line is detected), but when I use the PartialDiff: Save Comparison Result to File, it says all the lines are different. Check it and fix it.

@@ -15,7 +15,10 @@ export default class LineDiffer {
     }
 
     private splitLines(text: string): string[] {
-        return text.split('\n');
+        // Split on any line ending (CRLF, CR, or LF) so that lines differing
+        // only by their EOL style are treated as equal - matching how VS Code's
+        // built-in diff compares text.
+        return text.split(/\r\n|\r|\n/);
     }
 
     private buildLcsTable(a: string[], b: string[]): number[][] {
