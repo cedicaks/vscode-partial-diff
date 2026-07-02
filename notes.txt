@@ -1,0 +1,6 @@
+To build vsix:
+    npx @vscode/vsce package
+    code --install-extension partial-diff-1.4.6.vsix
+
+To test: 
+    press F5 ==> launch new VSCode instance with developed extension

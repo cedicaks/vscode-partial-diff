@@ -68,13 +68,16 @@ export default class DiffRenderer {
             '</head>',
             '<body>',
             '<!-- =====================================================================',
-            '     RENAME THE COMPARED FILES',
-            '     Edit the "left" and "right" values in the script block below,',
-            '     then save this file and reopen it. That is the only place the two',
-            '     names need to be changed - the title and column headers update from it.',
+            '     COMPARISON SETTINGS (edit in a text editor, then save and reopen)',
+            '       left / right : the file names shown in the title and column headers.',
+            '       swapped      : initial position. Set to true to open with the two',
+            '                      sides already swapped (left <-> right).',
             '     ===================================================================== -->',
             '<script>',
-            `window.partialDiffFiles = {left: ${this.jsString(fileName1)}, right: ${this.jsString(fileName2)}};`,
+            'window.partialDiffFiles = {' +
+                `left: ${this.jsString(fileName1)}, ` +
+                `right: ${this.jsString(fileName2)}, ` +
+                'swapped: false};',
             '</script>',
             '<header><h1 class="diff-title"></h1></header>',
             '<div class="pane-header">',
@@ -432,6 +435,9 @@ const SCRIPT = [
     'if(a&&r){var t=a.textContent;a.textContent=r.textContent;r.textContent=t;}}',
     'if(swapBtn)swapBtn.addEventListener("click",function(){',
     'document.body.classList.toggle("swapped");swapCounts();update();});',
+    // Initial position: open in the swapped state when configured to.
+    'var cfg=window.partialDiffFiles||{};',
+    'if(cfg.swapped){document.body.classList.add("swapped");swapCounts();}',
     'update();',
     '})();'
 ].join('');

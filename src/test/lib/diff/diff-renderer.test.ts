@@ -63,14 +63,21 @@ suite('DiffRenderer', () => {
         test('it exposes the file names as a single editable config block', () => {
             const result = renderer.toHtml('TITLE', 'FILE1', 'FILE2', ops);
 
-            assert.ok(result.includes('RENAME THE COMPARED FILES'));
-            assert.ok(result.includes('window.partialDiffFiles = {left: "FILE1", right: "FILE2"};'));
+            assert.ok(result.includes('COMPARISON SETTINGS'));
+            assert.ok(result.includes('window.partialDiffFiles = {left: "FILE1", right: "FILE2", swapped: false};'));
+        });
+
+        test('it exposes an editable "swapped" initial-position setting applied on load', () => {
+            const result = renderer.toHtml('TITLE', 'FILE1', 'FILE2', ops);
+
+            assert.ok(result.includes(', swapped: false};'));
+            assert.ok(result.includes('if(cfg.swapped){document.body.classList.add("swapped");swapCounts();}'));
         });
 
         test('it safely encodes file names that contain quotes or markup', () => {
             const result = renderer.toHtml('TITLE', 'a"b', 'c</script>d', ops);
 
-            assert.ok(result.includes('window.partialDiffFiles = {left: "a\\"b", right: "c\\u003c/script>d"};'));
+            assert.ok(result.includes('window.partialDiffFiles = {left: "a\\"b", right: "c\\u003c/script>d", swapped: false};'));
         });
 
         test('it escapes HTML special characters in the content', () => {

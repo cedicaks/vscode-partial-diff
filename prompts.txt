@@ -37,3 +37,6 @@ PROMPT7:
 1. Why after clicking the Swap button the page is not responding for several seconds?
 2. The same thing also happen if the browser tab containing the page (brave) to become a new window
 
+PROMPT8:
+
+11. Just like the PROMPT4. Add an 'initial-position' setting (initially swapped or not) as a boolean setting. if this value is true then the diff will initially show swapped state.
