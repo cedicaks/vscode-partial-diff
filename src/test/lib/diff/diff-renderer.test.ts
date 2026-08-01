@@ -1,9 +1,10 @@
 import DiffRenderer from '../../../lib/diff/diff-renderer';
 import {DiffOp} from '../../../lib/diff/line-differ';
+import InlineDiffer from '../../../lib/diff/inline-differ';
 import * as assert from 'assert';
 
 suite('DiffRenderer', () => {
-    const renderer = new DiffRenderer();
+    const renderer = new DiffRenderer(new InlineDiffer());
 
     const ops: DiffOp[] = [
         {type: 'equal', text: 'a'},
@@ -22,6 +23,18 @@ suite('DiffRenderer', () => {
         {type: 'delete', text: 'f'},
         {type: 'insert', text: 'g'},
         {type: 'equal', text: 'h'}
+    ];
+
+    // A line edited in place, preceded by two unrelated inserted lines: the
+    // edited pair must stay on the same row instead of being paired with the
+    // first insertion that happens to sit at the same offset.
+    const shiftedOps: DiffOp[] = [
+        {type: 'equal', text: 'aaa'},
+        {type: 'delete', text: 'value 09'},
+        {type: 'insert', text: 'added one'},
+        {type: 'insert', text: 'added two'},
+        {type: 'insert', text: 'value 10'},
+        {type: 'equal', text: 'bbb'}
     ];
 
     suite('#toUnifiedDiff', () => {
@@ -57,7 +70,36 @@ suite('DiffRenderer', () => {
             assert.ok(result.includes('<div class="pane-title ins" data-side="right"></div>'));
             assert.ok(result.includes('<tr class="del" data-kind="change">'));
             assert.ok(result.includes('<tr class="ins" data-kind="change">'));
-            assert.ok(result.includes('<td class="content">b</td>'));
+            assert.ok(result.includes('<td class="content"><span class="hl">b</span></td>'));
+        });
+
+        test('it highlights only the characters that changed within a modified line', () => {
+            const result = renderer.toHtml('TITLE', 'F1', 'F2', [
+                {type: 'delete', text: 'value 09'},
+                {type: 'insert', text: 'value 10'}
+            ]);
+
+            assert.ok(result.includes('<td class="content">value <span class="hl">09</span></td>'));
+            assert.ok(result.includes('<td class="content">value <span class="hl">10</span></td>'));
+        });
+
+        test('it lines a modified line up with the line it was modified from', () => {
+            const result = renderer.toHtml('TITLE', 'F1', 'F2', shiftedOps);
+
+            assert.ok(result.includes([
+                '<tr class="empty" data-kind="insert"><td class="lineno"></td><td class="content">&#8203;</td></tr>',
+                '<tr class="empty" data-kind="insert"><td class="lineno"></td><td class="content">&#8203;</td></tr>',
+                '<tr class="del" data-kind="change"><td class="lineno">2</td>' +
+                    '<td class="content">value <span class="hl">09</span></td></tr>'
+            ].join('\n')));
+            assert.ok(result.includes([
+                '<tr class="ins" data-kind="insert"><td class="lineno">2</td>' +
+                    '<td class="content">added one</td></tr>',
+                '<tr class="ins" data-kind="insert"><td class="lineno">3</td>' +
+                    '<td class="content">added two</td></tr>',
+                '<tr class="ins" data-kind="change"><td class="lineno">4</td>' +
+                    '<td class="content">value <span class="hl">10</span></td></tr>'
+            ].join('\n')));
         });
 
         test('it exposes the file names as a single editable config block', () => {
@@ -154,6 +196,10 @@ suite('DiffRenderer', () => {
     suite('#summarize', () => {
         test('it counts added, removed, and modified lines', () => {
             assert.deepEqual(renderer.summarize(mixedOps), {added: 1, removed: 1, modified: 1});
+        });
+
+        test('it counts an edited line as modified and the rest as added', () => {
+            assert.deepEqual(renderer.summarize(shiftedOps), {added: 2, removed: 0, modified: 1});
         });
 
         test('it reports zeroes for identical texts', () => {

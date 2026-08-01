@@ -1,4 +1,5 @@
 import {DiffOp} from './line-differ';
+import InlineDiffer, {InlineSegment, MAX_INLINE_LINE_LENGTH} from './inline-differ';
 
 interface NumberedLine {
     op: DiffOp;
@@ -14,6 +15,7 @@ interface Hunk {
 interface SideCell {
     no: number;
     text: string;
+    segments?: InlineSegment[];
 }
 
 type RowKind = 'equal' | 'change' | 'delete' | 'insert';
@@ -32,7 +34,19 @@ export interface DiffSummary {
 
 const CONTEXT_LINES = 3;
 
+// Character comparisons one document may spend on matching lines up and on
+// highlighting what changed inside them. Once it runs out the remaining blocks
+// are lined up by position and their lines marked as wholly changed, which is
+// what a diff of two completely unrelated texts looks like anyway.
+const WORK_BUDGET = 20000000;
+
+interface Budget {
+    remaining: number;
+}
+
 export default class DiffRenderer {
+
+    constructor(private readonly inlineDiffer: InlineDiffer) {}
 
     toUnifiedDiff(fileName1: string, fileName2: string, ops: DiffOp[]): string {
         const lines = this.numberLines(ops);
@@ -160,18 +174,13 @@ export default class DiffRenderer {
 
     private buildSideRows(ops: DiffOp[]): SideRow[] {
         const rows: SideRow[] = [];
+        const budget: Budget = {remaining: WORK_BUDGET};
         let oldNo = 1;
         let newNo = 1;
         let deletes: SideCell[] = [];
         let inserts: SideCell[] = [];
         const flush = () => {
-            const max = Math.max(deletes.length, inserts.length);
-            for (let i = 0; i < max; i++) {
-                const left = deletes[i] || null;
-                const right = inserts[i] || null;
-                const kind: RowKind = left && right ? 'change' : left ? 'delete' : 'insert';
-                rows.push({left, right, kind});
-            }
+            this.alignBlock(deletes, inserts, budget).forEach(row => rows.push(row));
             deletes = [];
             inserts = [];
         };
@@ -193,15 +202,126 @@ export default class DiffRenderer {
         return rows;
     }
 
+    // Lay a block of deleted and inserted lines out side by side. Lines that
+    // are variants of each other are matched up first, so that unrelated
+    // insertions keep their own rows instead of pushing a modified line out of
+    // line with the one it was modified from.
+    private alignBlock(deletes: SideCell[], inserts: SideCell[], budget: Budget): SideRow[] {
+        if (!deletes.length || !inserts.length) {
+            const deleteRows: SideRow[] = deletes.map(left => ({left, right: null, kind: 'delete' as RowKind}));
+            const insertRows: SideRow[] = inserts.map(right => ({left: null, right, kind: 'insert' as RowKind}));
+            return deleteRows.concat(insertRows);
+        }
+        const rows: SideRow[] = [];
+        let deleteIndex = 0;
+        let insertIndex = 0;
+        for (const [i, j] of this.findAnchors(deletes, inserts, budget)) {
+            this.pairByPosition(deletes.slice(deleteIndex, i), inserts.slice(insertIndex, j), budget)
+                .forEach(row => rows.push(row));
+            rows.push(this.changeRow(deletes[i], inserts[j], budget));
+            deleteIndex = i + 1;
+            insertIndex = j + 1;
+        }
+        this.pairByPosition(deletes.slice(deleteIndex), inserts.slice(insertIndex), budget)
+            .forEach(row => rows.push(row));
+        return rows;
+    }
+
+    // The longest run of (deleted line, inserted line) pairs that are similar
+    // enough to be the same line before and after an edit, keeping the original
+    // order of both sides. Returned as index pairs.
+    private findAnchors(deletes: SideCell[], inserts: SideCell[], budget: Budget): number[][] {
+        const n = deletes.length;
+        const m = inserts.length;
+        // Comparing every deleted line against every inserted one costs exactly
+        // the product of the two sides' character counts.
+        const cost = this.comparableLength(deletes) * this.comparableLength(inserts);
+        if (cost > budget.remaining) return [];
+        budget.remaining -= cost;
+        const table: number[][] = Array.from({length: n + 1}, () => new Array(m + 1).fill(0));
+        const similar: boolean[][] = Array.from({length: n}, () => new Array(m).fill(false));
+        for (let i = n - 1; i >= 0; i--) {
+            for (let j = m - 1; j >= 0; j--) {
+                similar[i][j] = this.inlineDiffer.areSimilar(deletes[i].text, inserts[j].text);
+                table[i][j] = similar[i][j]
+                    ? table[i + 1][j + 1] + 1
+                    : Math.max(table[i + 1][j], table[i][j + 1]);
+            }
+        }
+        const anchors: number[][] = [];
+        let i = 0;
+        let j = 0;
+        while (i < n && j < m) {
+            if (similar[i][j]) {
+                anchors.push([i, j]);
+                i++;
+                j++;
+            } else if (table[i + 1][j] >= table[i][j + 1]) {
+                i++;
+            } else {
+                j++;
+            }
+        }
+        return anchors;
+    }
+
+    private comparableLength(cells: SideCell[]): number {
+        return cells.reduce(
+            (total, cell) => total + Math.min(cell.text.length, MAX_INLINE_LINE_LENGTH + 1),
+            0
+        );
+    }
+
+    // Fallback for lines with no counterpart to match up with: pair them by
+    // position and pad the shorter side with filler rows.
+    private pairByPosition(deletes: SideCell[], inserts: SideCell[], budget: Budget): SideRow[] {
+        const rows: SideRow[] = [];
+        const max = Math.max(deletes.length, inserts.length);
+        for (let i = 0; i < max; i++) {
+            const left = deletes[i] || null;
+            const right = inserts[i] || null;
+            if (left && right) {
+                rows.push(this.changeRow(left, right, budget));
+            } else {
+                rows.push({left, right, kind: left ? 'delete' : 'insert'});
+            }
+        }
+        return rows;
+    }
+
+    private changeRow(left: SideCell, right: SideCell, budget: Budget): SideRow {
+        const cost = left.text.length * right.text.length;
+        const inline = budget.remaining >= cost
+            ? this.inlineDiffer.diff(left.text, right.text)
+            : null;
+        if (inline) budget.remaining -= cost;
+        return {
+            left: {...left, segments: inline ? inline.left : undefined},
+            right: {...right, segments: inline ? inline.right : undefined},
+            kind: 'change'
+        };
+    }
+
     private renderPaneRow(row: SideRow, side: 'left' | 'right'): string {
         const cell = side === 'left' ? row.left : row.right;
         const cssClass = this.cellClass(row, cell, side);
         const lineNo = cell ? String(cell.no) : '';
-        const content = cell && cell.text.length ? this.escapeHtml(cell.text) : '&#8203;';
+        const content = cell && cell.text.length ? this.renderContent(cell) : '&#8203;';
         return `<tr class="${cssClass}" data-kind="${row.kind}">` +
             `<td class="lineno">${lineNo}</td>` +
             `<td class="content">${content}</td>` +
             '</tr>';
+    }
+
+    // Changed lines get the parts that actually differ wrapped in a marker, so
+    // a one character edit does not read as a whole rewritten line.
+    private renderContent(cell: SideCell): string {
+        if (!cell.segments) return this.escapeHtml(cell.text);
+        return cell.segments
+            .map(segment => segment.type === 'equal'
+                ? this.escapeHtml(segment.text)
+                : `<span class="hl">${this.escapeHtml(segment.text)}</span>`)
+            .join('');
     }
 
     private cellClass(row: SideRow, cell: SideCell | null, side: 'left' | 'right'): string {
@@ -326,9 +446,14 @@ const STYLE = [
     'tr.del td.content{background:rgba(248,81,73,0.15);color:#ffdcd7;}',
     'tr.ins td.content{background:rgba(63,185,80,0.15);color:#aff5b4;}',
     'tr.empty td{background:rgba(110,118,129,0.08);}',
+    // The exact characters that changed within a modified line.
+    'tr.del td.content .hl{background:rgba(248,81,73,0.4);border-radius:2px;}',
+    'tr.ins td.content .hl{background:rgba(63,185,80,0.4);border-radius:2px;}',
     // Swap: removals become additions and vice versa.
     '.swapped tr.del td.content{background:rgba(63,185,80,0.15);color:#aff5b4;}',
     '.swapped tr.ins td.content{background:rgba(248,81,73,0.15);color:#ffdcd7;}',
+    '.swapped tr.del td.content .hl{background:rgba(63,185,80,0.4);}',
+    '.swapped tr.ins td.content .hl{background:rgba(248,81,73,0.4);}',
     // Separator between blocks in "show only differences" mode: a thick line
     // with a bit of breathing room above (block-end) and below (block-start).
     'tr.block-start td{border-top:3px solid #484f58;padding-top:0.5rem;}',

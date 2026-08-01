@@ -44,3 +44,42 @@ PROMPT8:
 PROMPT9:
 
 1. In the "safe to file" feature. It looks like the comparison think the line ended with \r and \r\n is different although the line content is the same. Because when I use the PartialDiff: Compare Text With Clipboard the comparison is good (only different line is detected), but when I use the PartialDiff: Save Comparison Result to File, it says all the lines are different. Check it and fix it.
+
+PROMPT10:
+
+1. I think the logic of comparing slightly difference between the "PartialDiff: Compare Text with Clipboard" and the "PartialDiff: Save Comparison result to a file". For example comparing: (---- is the delimiter)
+----
+  btn2: 
+    07 F0 01 20 09
+    07 B8 02 20 09
+    07 80 03 20 09
+    07 48 04 20 09
+    07 10 05 20 09
+    07 D8 05 20 09
+    07 A0 06 20 09
+    07 68 07 20 09
+    07 30 08 20 09
+    00 30 08 20 09
+---- 
+
+with 
+
+----
+  btn2: 
+    07 F0 01 20 09
+    07 B8 02 20 09
+    07 80 03 20 09
+    07 48 04 20 09
+    07 10 05 20 09
+    tambah
+    tambah+
+    07 D8 05 20 10
+    07 A0 06 20 09
+    07 68 07 20 09
+    07 30 08 20 09
+    00 30 08 20 09
+----
+
+the "Save Comparison result to a file" first mark remove the "07 D8 05 20 09" line first followed by add the "tambah"* lines. but the "Compare Text with Clipboard" add the "tambah"* lines first followed by mark "07 D8 05 20 09" as removed. I want to the comparison algorithm of "Save comparison result to a file" is duplicate of the "Compare Text With clipboard" algorithm.
+
+2. Just like in the "Compare text with clipboard', I want the "Save comparison result to a file" results also show / highlight the exact position of characters of a line that is changed (not just remove entire line and add whole new line, but the change is merely only a few characters)

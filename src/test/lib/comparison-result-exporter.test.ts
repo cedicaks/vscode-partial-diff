@@ -1,6 +1,7 @@
 import ComparisonResultExporter from '../../lib/comparison-result-exporter';
 import LineDiffer from '../../lib/diff/line-differ';
 import DiffRenderer from '../../lib/diff/diff-renderer';
+import InlineDiffer from '../../lib/diff/inline-differ';
 import TextProcessRuleApplier from '../../lib/text-process-rule-applier';
 import TextTitleBuilder from '../../lib/text-title-builder';
 import {SelectionInfo} from '../../lib/types/selection-info';
@@ -17,7 +18,7 @@ suite('ComparisonResultExporter', () => {
         when(textProcessRuleApplier.applyTo('a\nB')).thenReturn('a\nB');
         return new ComparisonResultExporter(
             new LineDiffer(),
-            new DiffRenderer(),
+            new DiffRenderer(new InlineDiffer()),
             textProcessRuleApplier,
             new TextTitleBuilder()
         );
@@ -50,7 +51,7 @@ suite('ComparisonResultExporter', () => {
         when(textProcessRuleApplier.applyTo('a\nB')).thenReturn('x');
         const exporter = new ComparisonResultExporter(
             new LineDiffer(),
-            new DiffRenderer(),
+            new DiffRenderer(new InlineDiffer()),
             textProcessRuleApplier,
             new TextTitleBuilder()
         );

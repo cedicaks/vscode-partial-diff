@@ -11,6 +11,7 @@ import LastComparisonStore from './last-comparison-store';
 import ComparisonResultExporter from './comparison-result-exporter';
 import LineDiffer from './diff/line-differ';
 import DiffRenderer from './diff/diff-renderer';
+import InlineDiffer from './diff/inline-differ';
 import TextProcessRuleApplier from './text-process-rule-applier';
 import TextTitleBuilder from './text-title-builder';
 import CommandAdaptor from './adaptors/command';
@@ -70,7 +71,7 @@ export default class CommandFactory {
     createSaveComparisonResultCommand(): Command {
         const exporter = new ComparisonResultExporter(
             new LineDiffer(),
-            new DiffRenderer(),
+            new DiffRenderer(new InlineDiffer()),
             new TextProcessRuleApplier(this.normalisationRuleStore),
             new TextTitleBuilder()
         );
